@@ -1,0 +1,68 @@
+CONCLUSIONES Y HALLAZGOS - PRUEBA E2E SAUCEDEMO
+===============================================
+
+RESULTADO
+- El flujo E2E completo se automatizó y se ejecuta con éxito: login con standard_user,
+  agregar 2 productos (Sauce Labs Backpack y Sauce Labs Bike Light), visualizar el carrito
+  y validar su contenido, diligenciar el formulario de compra, finalizar y validar la
+  confirmación de la orden.
+- Tiempo aproximado de ejecución: 10-15 s en modo headless (sin contar la primera descarga
+  de dependencias).
+- Evidencia: evidencias/serenity-report/index.html (capturas por cada acción).
+
+HALLAZGOS
+1. Diferencia entre el requisito y la aplicación en el mensaje de confirmación.
+   El enunciado pide validar "THANK YOU FOR YOUR ORDER", pero la aplicación muestra
+   "Thank you for your order!" (otras mayúsculas y signo de exclamación al final).
+   La primera ejecución con una comparación exacta (sin distinguir mayúsculas) falló con:
+     Expected: "THANK YOU FOR YOUR ORDER"   Actual: "Thank you for your order!"
+   Decisión: se conserva el texto del requisito en el feature y la validación se hace con
+   "contiene, sin distinguir mayúsculas". Así se verifica el mensaje de negocio sin hacer
+   frágil la prueba por detalles de presentación. Se recomienda alinear el criterio de
+   aceptación con el texto real.
+
+2. La contraseña secret_sauce está en listas públicas de contraseñas filtradas. Chrome
+   puede mostrar el diálogo "Cambia tu contraseña", que bloquea la interacción. Se
+   desactivó en serenity.conf (preferencias del gestor de contraseñas y modo incógnito).
+
+3. La aplicación expone atributos data-test estables en todos los elementos del flujo.
+   Se usaron como localizadores en vez de clases CSS o XPath por posición, lo que hace las
+   pruebas más robustas ante cambios visuales.
+
+4. Manejo seguro de la clave de acceso.
+   - La clave no se versiona: se lee de la variable de entorno SAUCEDEMO_PASSWORD
+     (en CI, desde un secret de GitHub), y si falta la prueba falla con un mensaje claro.
+   - Hallazgo: aunque la clave salga del código, la acción estándar Enter.theValue(...)
+     de Serenity escribe el valor en el reporte ("Juan enters '<clave>' into campo clave"),
+     y la versión 5.3.9 no tiene una opción para enmascararlo. Se creó la interacción
+     IngresarTextoSensible, que en el reporte solo muestra "ingresa un valor protegido".
+     Se verificó que el reporte generado no contiene la clave.
+
+5. Selenium muestra la advertencia "Unable to find CDP implementation matching <versión>"
+   cuando Chrome es más nuevo que el soporte CDP de Selenium. No afecta la prueba
+   (no se usa DevTools), pero conviene tenerla presente al actualizar versiones.
+
+DECISIONES DE DISEÑO
+- Patrón Screenplay (según la documentación oficial de Serenity): el actor ejecuta Tasks
+  (intención de negocio) compuestas por Interactions (Click, Enter, Open) y verifica con
+  Questions. Las clases *Page solo contienen Targets, sin lógica.
+- SOLID:
+  * SRP: cada Task hace una sola cosa del negocio; cada Question responde una sola pregunta.
+  * OCP: AgregarProductos recibe la lista desde el feature; agregar o cambiar productos no
+    requiere cambiar código, gracias a un Target parametrizado ({0} = nombre del producto).
+  * DIP: los step definitions dependen de Tasks y Questions, nunca de WebDriver.
+- Datos de prueba en el feature (DataTables) y mapeados a un modelo (record Comprador)
+  con @DataTableType.
+- El actor recuerda los productos seleccionados (remember/recall) para validar el carrito
+  sin duplicar datos en los pasos.
+- Validaciones con Ensure de Serenity, que quedan descritas en el reporte.
+- Se reinicia el navegador en cada escenario para que los escenarios no dependan entre sí.
+- Headless por defecto, para ejecutar en CI; se puede cambiar con -Dheadless.mode=false.
+
+MEJORAS PROPUESTAS
+- Escenarios negativos: locked_out_user, credenciales inválidas, campos obligatorios vacíos
+  en el checkout.
+- Esquema del escenario (Scenario Outline) para comprar distintas combinaciones de productos.
+- Validar en el resumen del checkout el subtotal, el impuesto y el total.
+- Ejecución en varios navegadores y en paralelo en CI.
+- Publicar el reporte de Serenity en GitHub Pages como documentación viva.

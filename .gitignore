@@ -16,3 +16,8 @@ buildNumber.properties
 
 # Avoid ignoring Maven wrapper jar file (.jar files are usually ignored)
 !/.mvn/wrapper/maven-wrapper.jar
+
+# Claude Code (archivos locales, no se versionan)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
